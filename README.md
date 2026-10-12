@@ -104,9 +104,18 @@ The package is created under:
 src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/portable/
 ```
 
-Gaming Mode validation is ongoing. Do not treat the current launcher script as
-a finished release integration until the Gamescope black-screen issue and land
-transition have both been verified.
+SteamOS Gaming Mode is verified through the portable
+`launch-gaming-mode.sh` entry point. The verified flow includes launcher startup,
+automatic Gamescope window association, game startup, land connection, dynamic
+server events, controller input, and normal shutdown.
+
+The portable package includes `mezeporta-proton-host.sh`, so it does not depend
+on a source checkout. Add `launch-gaming-mode.sh` to Steam as a non-Steam game,
+set **Start In** to the extracted game directory, and do not force a Steam Play
+compatibility tool on the Linux script.
+
+The current portable build runs the launcher inside the `mhfz-dev` Distrobox
+container and runs Proton Experimental on the SteamOS host.
 
 ## Server Wrapper (Server Owners)
 > [!NOTE]

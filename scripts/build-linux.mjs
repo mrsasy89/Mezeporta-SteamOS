@@ -4,6 +4,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   unlinkSync,
@@ -38,6 +39,9 @@ function sanitizeLinuxPath(inputPath) {
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "..");
+const packageVersion = JSON.parse(
+  readFileSync(resolve(projectRoot, "package.json"), "utf8")
+).version;
 const linuxBundleDir = resolve(
   projectRoot,
   "src-tauri",
@@ -55,7 +59,7 @@ const linuxReleaseDir = resolve(
   "release"
 );
 const appDirPath = resolve(linuxBundleDir, "mezeporta.AppDir");
-const appImageFileName = "mezeporta_1.5.2_amd64.AppImage";
+const appImageFileName = `mezeporta_${packageVersion}_amd64.AppImage`;
 const extractedLinuxdeployDir = resolve(linuxBundleDir, ".linuxdeploy-tools");
 const portableBundleDir = resolve(
   projectRoot,
@@ -69,11 +73,18 @@ const portableBundleDir = resolve(
 const portableStagingDir = resolve(portableBundleDir, "Mezeporta-linux-x64-portable");
 const portableTarballPath = resolve(
   portableBundleDir,
-  "Mezeporta_1.5.2_linux_x64_portable.tar.gz"
+  `Mezeporta_${packageVersion}_linux_x64_portable.tar.gz`
 );
 const linuxBinaryFileNames = ["mezeporta", "app"];
 const mezeDepsSourcePath = resolve(projectRoot, "src-tauri", "bin", "meze-deps.exe");
 const audioSourceDir = resolve(projectRoot, "public", "audio");
+const protonHostBridgeSourcePath = resolve(
+  projectRoot,
+  "scripts",
+  "linux",
+  "proton-host-debug.sh"
+);
+const portableProtonHostBridgeFileName = "mezeporta-proton-host.sh";
 const portableOnly = argv.includes("--portable-only");
 const runtimeSetupScripts = [
   [
@@ -272,6 +283,55 @@ exec "$HERE/mezeporta-bin" "$@"
   chmodSync(launcherPath, 0o755);
 }
 
+function copyPortableProtonHostBridge() {
+  if (!existsSync(protonHostBridgeSourcePath)) {
+    throw new Error(`Missing Proton host bridge: ${protonHostBridgeSourcePath}`);
+  }
+
+  const destination = resolve(
+    portableStagingDir,
+    portableProtonHostBridgeFileName
+  );
+  copyFileSync(protonHostBridgeSourcePath, destination);
+  chmodSync(destination, 0o755);
+}
+
+function writePortableGamingModeScript() {
+  const launcherPath = resolve(portableStagingDir, "launch-gaming-mode.sh");
+  writeFileSync(
+    launcherPath,
+    `#!/usr/bin/env bash
+set -euo pipefail
+
+here="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+container="\${MEZEPORTA_DISTROBOX_NAME:-mhfz-dev}"
+proton="\${MEZEPORTA_HOST_PROTON:-$HOME/.local/share/Steam/steamapps/common/Proton - Experimental/proton}"
+log_file="\${MEZEPORTA_GAMING_LOG:-$HOME/.local/state/mezeporta/gaming-mode.log}"
+
+if ! command -v distrobox >/dev/null 2>&1; then
+  printf 'Mezeporta requires Distrobox for this portable build.\\n' >&2
+  exit 127
+fi
+
+if [[ ! -x "$proton" ]]; then
+  printf 'Proton executable not found: %s\\n' "$proton" >&2
+  exit 127
+fi
+
+mkdir -p "$(dirname -- "$log_file")"
+cd "$here"
+
+exec distrobox enter "$container" -- env \\
+  MEZEPORTA_PROTON_CMD="$here/${portableProtonHostBridgeFileName}" \\
+  MEZEPORTA_HOST_PROTON="$proton" \\
+  "$here/run-mezeporta.sh" \\
+  >>"$log_file" 2>&1
+`,
+    { mode: 0o755 }
+  );
+  chmodSync(launcherPath, 0o755);
+}
+
 function writePortableReadme() {
   writeFileSync(
     resolve(portableStagingDir, "README-Linux-Portable.txt"),
@@ -281,11 +341,20 @@ Extract these files into the folder where the launcher should live, then run:
 
 ./run-mezeporta.sh
 
+For SteamOS Gaming Mode, add this script to Steam as a non-Steam game:
+
+./launch-gaming-mode.sh
+
+Set the shortcut Start In directory to the extracted game folder and do not force a Steam Play compatibility tool on the Linux script.
+The Gaming Mode script uses the mhfz-dev Distrobox container by default. Set MEZEPORTA_DISTROBOX_NAME to override it.
+
 This archive is intentionally flat so it can be extracted directly beside the game files instead of creating another nested launcher folder.
 The launcher creates its runtime data under ./Mezeporta, so do not rename any extracted file to Mezeporta.
 
 Included layout:
 - run-mezeporta.sh: launcher script
+- launch-gaming-mode.sh: self-contained SteamOS Gaming Mode entry point
+- mezeporta-proton-host.sh: bridge from Distrobox to host Proton Experimental
 - mezeporta-bin: Linux launcher executable
 - Mezeporta/bin/meze-deps.exe: helper used by Linux/Wine patch flows
 - Mezeporta/audio/: UI sound effects for Linux builds
@@ -324,6 +393,8 @@ function createPortableTarball(sanitizedPath) {
   }
 
   writePortableLauncherScript();
+  copyPortableProtonHostBridge();
+  writePortableGamingModeScript();
   writePortableReadme();
 
   rmSync(portableTarballPath, { force: true });
