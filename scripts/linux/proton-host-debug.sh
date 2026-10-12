@@ -18,7 +18,7 @@ forward_env=(
   "STEAM_COMPAT_DATA_PATH=$STEAM_COMPAT_DATA_PATH"
   "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_COMPAT_CLIENT_INSTALL_PATH"
 )
-for key in PROTON_USE_WINED3D WINEESYNC WINEFSYNC WINEDLLOVERRIDES; do
+for key in PROTON_USE_WINED3D WINEESYNC WINEFSYNC WINEDLLOVERRIDES DISPLAY XAUTHORITY SteamAppId SteamGameId SteamOverlayGameId; do
   if [[ -v $key ]]; then forward_env+=("$key=${!key}"); fi
 done
 
@@ -40,6 +40,18 @@ args = sys.argv[3:]
 print("Operation:", "helper stdin" if "--stdin-b64" in args else "runtime setup", flush=True)
 command = [sys.executable, proton, *args]
 if "--stdin-b64" in args:
+    # Recupera il GameID del collegamento non Steam ricevuto da Distrobox.
+    steam_game_id = os.environ.get("SteamGameId", "")
+    if not steam_game_id.isdecimal() or int(steam_game_id) == 0:
+        steam_game_id = os.environ.get("SteamOverlayGameId", "")
+    if steam_game_id.isdecimal() and 0 < int(steam_game_id) < (1 << 64):
+        game_id = int(steam_game_id)
+        # Nei collegamenti non Steam, AppID occupa i 32 bit superiori.
+        app_id = game_id >> 32 if game_id > 0xffffffff else game_id
+        os.environ["SteamGameId"] = str(game_id)
+        if os.environ.get("SteamAppId", "0") in ("", "0"):
+            os.environ["SteamAppId"] = str(app_id)
+        print("Steam shortcut AppID:", os.environ["SteamAppId"], flush=True)
     payload = sys.stdin.buffer.read()
     print("Helper stdin bytes:", len(payload), flush=True)
     try:
@@ -71,12 +83,97 @@ if "--stdin-b64" in args:
 
         print("Transport: private config file to GUI helper", flush=True)
         with tempfile.TemporaryFile() as output_file:
-            result = subprocess.run(
+            result = subprocess.Popen(
                 command,
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT,
             )
+
+            import re, shutil
+
+            app_id = os.environ.get("SteamAppId", "")
+            associate_windows = (
+                app_id.isdecimal()
+                and 0 < int(app_id) <= 0xffffffff
+                and bool(os.environ.get("DISPLAY"))
+                and shutil.which("xwininfo") is not None
+                and shutil.which("xprop") is not None
+            )
+
+            if app_id and not associate_windows:
+                print(
+                    "Gamescope association unavailable: check DISPLAY and X11 tools",
+                    flush=True,
+                )
+
+            tagged_windows = set()
+            expected_class = (
+                "(\"steam_app_" + app_id + "\" "
+                "\"steam_app_" + app_id + "\")"
+            )
+
+            while result.poll() is None:
+                if associate_windows:
+                    try:
+                        tree = subprocess.run(
+                            ["xwininfo", "-root", "-tree"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL,
+                            text=True,
+                            timeout=2,
+                        )
+
+                        for line in tree.stdout.splitlines():
+                            # Seleziona solo la finestra MHFZ di questo collegamento.
+                            match = re.match(
+                                r"\s*(0x[0-9a-fA-F]+)\s+"
+                                r"\"[^\"]*MONSTER HUNTER FRONTIER[^\"]*\":",
+                                line,
+                                re.IGNORECASE,
+                            )
+
+                            if not match or expected_class not in line:
+                                continue
+
+                            window_id = match.group(1)
+                            if window_id in tagged_windows:
+                                continue
+
+                            tagged = subprocess.run(
+                                [
+                                    "xprop",
+                                    "-id",
+                                    window_id,
+                                    "-f",
+                                    "STEAM_GAME",
+                                    "32c",
+                                    "-set",
+                                    "STEAM_GAME",
+                                    app_id,
+                                ],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=2,
+                            )
+
+                            if tagged.returncode == 0:
+                                tagged_windows.add(window_id)
+                                print(
+                                    "Gamescope window associated:",
+                                    window_id,
+                                    "AppID:",
+                                    app_id,
+                                    flush=True,
+                                )
+                    except (OSError, subprocess.TimeoutExpired):
+                        # X11 o la finestra possono chiudersi durante uscita.
+                        pass
+
+                try:
+                    result.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    pass
             output_file.seek(0)
             process_output = output_file.read()
 
