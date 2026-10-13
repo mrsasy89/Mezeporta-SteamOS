@@ -4,6 +4,15 @@ Build Windows artifacts on a Windows runner through **Build Windows** in GitHub
 Actions. This route does not require a local Windows machine or cross-compilation
 toolchain on SteamOS. The Linux AppImage is a separate package.
 
+## Verified build — 13 October 2026
+
+The Windows 2022 runner successfully compiled the x86 launcher, generated its
+NSIS installer and portable ZIP, calculated checksums and uploaded the artifact
+from commit `f2bf9c6f85b0d78356d630cf9943f02ae250cdc7`.
+See [the successful run](https://github.com/mrsasy89/Mezeporta-SteamOS/actions/runs/38418894297).
+This is build/packaging validation; login and game launch on Windows are not yet
+confirmed.
+
 ## Run and download
 
 1. Push reviewed application or build changes to `steamos-dev`; they start the

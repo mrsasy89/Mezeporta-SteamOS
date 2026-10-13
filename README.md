@@ -31,7 +31,7 @@ Active SteamOS development is maintained on the `steamos-dev` branch.
 | Launcher shutdown while the game remains running | Verified |
 | Higher resolutions and external televisions | Not yet tested |
 | Current rebuilt portable package | Generated; needs its own runtime retest |
-| Native Windows packaging | GitHub Actions workflow provided |
+| Native Windows x86 build, installer and portable ZIP | Verified in GitHub Actions; game runtime test pending |
 
 See [Docs/SteamOS.md](Docs/SteamOS.md) for the implementation notes and
 requirements, implementation notes, troubleshooting and validation evidence.
