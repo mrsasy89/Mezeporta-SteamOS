@@ -68,9 +68,13 @@ use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, LPARAM, LRESULT, REC
 use windows::Win32::System::Threading::{CreateMutexW, OpenMutexW, MUTEX_ALL_ACCESS};
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallWindowProcW, DefWindowProcW, SetWindowLongPtrW, GWLP_WNDPROC, WMSZ_BOTTOM, WMSZ_BOTTOMLEFT,
+    CallWindowProcW, DefWindowProcW, GWLP_WNDPROC, WMSZ_BOTTOM, WMSZ_BOTTOMLEFT,
     WMSZ_LEFT, WMSZ_RIGHT, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WM_SIZING, WNDPROC,
 };
+#[cfg(all(windows, target_pointer_width = "32"))]
+use windows::Win32::UI::WindowsAndMessaging::SetWindowLongW as SetWindowLongPtrW;
+#[cfg(all(windows, target_pointer_width = "64"))]
+use windows::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW;
 
 #[cfg_attr(not(windows), allow(dead_code))]
 enum ExitSignal {
@@ -1065,7 +1069,7 @@ fn install_ps4_aspect_lock(window: &Window) {
         SetWindowLongPtrW(
             hwnd,
             GWLP_WNDPROC,
-            ps4_aspect_window_proc as *const () as i32,
+            ps4_aspect_window_proc as *const () as _,
         )
     };
     if previous == 0 {
