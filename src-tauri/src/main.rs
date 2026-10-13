@@ -5058,7 +5058,10 @@ async fn create_character(
             state_sync.skip_child_cleanup_once = true;
             cancel_all_requests(&mut state_sync);
             drop(state_sync);
-            window.app_handle().exit(0);
+            window.close().map_err(|e| {
+                error!("failed to close launcher after game start: {}", e);
+                "internal-error"
+            })?;
             return Ok(());
         }
 
@@ -5113,7 +5116,10 @@ async fn create_character(
             state_sync.skip_child_cleanup_once = true;
             cancel_all_requests(&mut state_sync);
             drop(state_sync);
-            window.app_handle().exit(0);
+            window.close().map_err(|e| {
+                error!("failed to close launcher after game start: {}", e);
+                "internal-error"
+            })?;
             return Ok(());
         }
 
@@ -5184,7 +5190,10 @@ async fn select_character(
         state_sync.skip_child_cleanup_once = true;
         cancel_all_requests(&mut state_sync);
         drop(state_sync);
-        window.app_handle().exit(0);
+        window.close().map_err(|e| {
+            error!("failed to close launcher after game start: {}", e);
+            "internal-error"
+        })?;
         return Ok(());
     }
 

@@ -1,5 +1,10 @@
 # SteamOS handoff — 2026-10-09
 
+> Historical checkpoint. For the current verified AppImage, native 1080p Gaming
+> Mode, required Steam Linux Runtime and build instructions, read
+> [SteamOS.md](SteamOS.md), [Windows.md](Windows.md) and the main README.
+> The startup/game-launch status below describes 9 October, not the current port.
+
 ## Goal and current status
 
 Port Mezeporta CLI-dev to SteamOS, initially Desktop Mode, for an Erupe

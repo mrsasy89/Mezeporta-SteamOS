@@ -2,16 +2,18 @@
 
 Mezeporta is a Monster Hunter Frontier launcher for Erupe community servers,
 supporting 19 versions across all game branches. This fork focuses on running
-the launcher and Windows game client on SteamOS through Proton and Distrobox.
+the launcher and Windows game client on SteamOS through Proton's required
+Steam Linux Runtime. The standalone AppImage runs directly on SteamOS;
+Distrobox is used for building it and for the alternative portable package.
 
 It is based on [LilButter/Mezeporta](https://github.com/LilButter/Mezeporta).
 Active SteamOS development is maintained on the `steamos-dev` branch.
 
 > [!IMPORTANT]
-> Desktop Mode login and game launch have been verified on SteamOS with Proton
-> Experimental. Gaming Mode currently reaches game launch, but a black-screen
-> issue under Gamescope is still being investigated. Full Gaming Mode support
-> is not yet considered complete.
+> The AppImage has been tested in Desktop Mode and Gaming Mode at native
+> **1920×1080**, including land entry, mouse, keyboard, controller and normal
+> shutdown. Proton Experimental runs through its declared Steam Linux Runtime.
+> Resolutions above 1080p have not yet been tested.
 
 ## SteamOS status
 
@@ -19,16 +21,42 @@ Active SteamOS development is maintained on the `steamos-dev` branch.
 | --- | --- |
 | Launcher build and startup in an Arch Distrobox | Verified |
 | Login, character selection and game launch in Desktop Mode | Verified |
-| Proton Experimental host execution from Distrobox | Verified |
+| Proton Experimental through its required Steam Linux Runtime | Verified |
 | Paths containing spaces | Verified |
 | Native KDE folder picker on SteamOS | Verified |
 | Hidden helper transport without a console window | Verified |
-| Portable Linux package | Desktop Mode verified |
-| Gaming Mode / Gamescope | In progress |
-| Land transition and game-server port handoff in Gaming Mode | Not yet verified |
+| Standalone AppImage without an external Proton proxy | Verified |
+| Gaming Mode / Gamescope at native 1920×1080 | Verified |
+| Land entry, mouse, keyboard and controller | Verified |
+| Launcher shutdown while the game remains running | Verified |
+| Higher resolutions and external televisions | Not yet tested |
+| Current rebuilt portable package | Generated; needs its own runtime retest |
+| Native Windows packaging | GitHub Actions workflow provided |
 
 See [Docs/SteamOS.md](Docs/SteamOS.md) for the implementation notes and
-validation plan.
+requirements, implementation notes, troubleshooting and validation evidence.
+
+## SteamOS AppImage: recommended installation
+
+1. Keep the AppImage in a permanent directory and make it executable:
+   `chmod +x Mezeporta-SteamOS.AppImage`.
+2. Open it in Desktop Mode, select the MHFZ game directory and set
+   **Wine Prefix: Proton** in launcher settings.
+3. Install Proton Experimental and its required Steam Linux Runtime through
+   Steam. The tested Experimental version requires **Steam Linux Runtime 4.0**.
+4. Add the AppImage as a non-Steam shortcut. Point directly to the AppImage,
+   leave **Launch Options empty**, and leave **Force the use of a specific
+   Steam Play compatibility tool disabled**. The native Linux launcher selects
+   Proton for the Windows game itself.
+5. Launch that shortcut in Gaming Mode. Native 1920×1080 has been verified.
+
+The AppImage includes its host bridge and stages it outside the temporary mount
+so the game can outlive the launcher. No external test proxy or Distrobox is
+needed to run this package. Game files and configuration remain in the selected
+game directory; the AppImage does not contain the game client.
+
+See [Docs/Windows.md](Docs/Windows.md) to build native Windows packages from
+SteamOS through GitHub Actions.
 
 ## How to run
 
@@ -74,10 +102,11 @@ Launch command:
 
 _FOR S7K version move ALL files from the provided folder into the game directory with the launcher._
 
-### SteamOS Desktop Mode
+### SteamOS development and portable Linux package
 
 The currently verified development workflow runs the Linux launcher inside an
-Arch Distrobox while Proton Experimental runs on the SteamOS host:
+Arch Distrobox while the bridge enters the host and invokes Proton through its
+required Steam Linux Runtime:
 
 ```bash
 export MEZEPORTA_PROTON_CMD="$PWD/scripts/linux/proton-host-debug.sh"
@@ -104,18 +133,11 @@ The package is created under:
 src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/portable/
 ```
 
-SteamOS Gaming Mode is verified through the portable
-`launch-gaming-mode.sh` entry point. The verified flow includes launcher startup,
-automatic Gamescope window association, game startup, land connection, dynamic
-server events, controller input, and normal shutdown.
-
-The portable package includes `mezeporta-proton-host.sh`, so it does not depend
-on a source checkout. Add `launch-gaming-mode.sh` to Steam as a non-Steam game,
-set **Start In** to the extracted game directory, and do not force a Steam Play
-compatibility tool on the Linux script.
-
-The current portable build runs the launcher inside the `mhfz-dev` Distrobox
-container and runs Proton Experimental on the SteamOS host.
+For the AppImage, use `npm run tauri:build:linux` in the build Distrobox.
+`CARGO_TARGET_DIR`, when set, controls both AppImage and portable output paths.
+The AppImage is the package validated in Gaming Mode. The portable Distrobox
+workflow has separate prerequisites and needs a retest of its current package;
+see the SteamOS guide.
 
 ## Server Wrapper (Server Owners)
 > [!NOTE]
@@ -282,13 +304,15 @@ You will also need the [CodeDoctor](https://github.com/JackAston/OllyDbg1plugins
 
 Requirements:
 
-- Node.js and npm.
-- Rustup.
+- Windows, Node.js 22 and npm.
+- Rust with the `i686-pc-windows-msvc` target.
+- Visual Studio C++ Build Tools and a Windows SDK.
+- WebView2 Runtime for running the launcher.
 
 Setup:
 
 ```powershell
-npm install
+npm ci
 rustup target add i686-pc-windows-msvc
 ```
 
@@ -301,8 +325,14 @@ npm run tauri:dev
 Build:
 
 ```powershell
-npm run tauri:build
+npm run tauri:build -- --ci --target i686-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 ```
+
+Windows packages target x86 to match the 32-bit game and also run on 64-bit
+Windows. From SteamOS, open GitHub **Actions → Build Windows → Run workflow**
+on `steamos-dev`. The workflow uploads an NSIS installer, a portable ZIP and
+SHA-256 checksums; it does not publish a release. See
+[Docs/Windows.md](Docs/Windows.md) for details.
 
 ## WSL Linux Development
 

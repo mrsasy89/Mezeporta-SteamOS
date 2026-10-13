@@ -1,0 +1,16 @@
+{
+  "tauri": {
+    "bundle": {
+      "active": true,
+      "targets": ["nsis"],
+      "icon": ["icons/icon.ico"],
+      "resources": ["../public/audio"],
+      "windows": {
+        "webviewInstallMode": {
+          "type": "downloadBootstrapper",
+          "silent": true
+        }
+      }
+    }
+  }
+}

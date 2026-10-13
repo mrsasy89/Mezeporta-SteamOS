@@ -1,0 +1,84 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [steamos-dev]
+    paths:
+      - .github/workflows/windows-build.yml
+      - src/**
+      - public/**
+      - src-tauri/**
+      - scripts/build-frontend.mjs
+      - package.json
+      - package-lock.json
+      - vite.config.js
+      - index.html
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build x86 Windows launcher and installer
+        run: npm run tauri:build -- --ci --target i686-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
+      - name: Package portable launcher and checksums
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $release = 'src-tauri/target/i686-pc-windows-msvc/release'
+          $portable = "artifacts/Mezeporta_${version}_windows_x86_portable"
+          if (!(Test-Path "$release/app.exe")) { throw 'Built launcher not found' }
+          New-Item -ItemType Directory -Force $portable | Out-Null
+          Copy-Item "$release/app.exe" "$portable/Mezeporta.exe"
+          Copy-Item public/audio "$portable/audio" -Recurse
+          Copy-Item LICENSE $portable
+          @"
+          Place Mezeporta.exe and audio beside the game's dat directory.
+          Requires Microsoft Edge WebView2 Runtime. This is an unsigned x86 build.
+          Build commit: $env:GITHUB_SHA
+          "@ | Set-Content "$portable/README.txt" -Encoding utf8
+          Compress-Archive -Path "$portable/*" -DestinationPath "$portable.zip"
+          $installers = @(Get-ChildItem "$release/bundle/nsis/*.exe")
+          if ($installers.Count -eq 0) { throw 'NSIS installer not found' }
+          Copy-Item $installers.FullName artifacts/
+          Get-ChildItem artifacts -File | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content artifacts/SHA256SUMS.txt -Encoding ascii
+          "Commit: $env:GITHUB_SHA" | Set-Content artifacts/BUILD.txt -Encoding ascii
+          Get-Content artifacts/SHA256SUMS.txt
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mezeporta-windows-x86-${{ github.sha }}
+          path: |
+            artifacts/*.zip
+            artifacts/*.exe
+            artifacts/SHA256SUMS.txt
+            artifacts/BUILD.txt
+          if-no-files-found: error
+          retention-days: 30

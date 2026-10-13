@@ -279,6 +279,11 @@ impl InnerWebView {
       settings.set_enable_webgl(true);
       settings.set_enable_webaudio(true);
 
+      if std::env::var("MEZEPORTA_WEBKIT_DIAGNOSTICS").ok().as_deref() == Some("1") {
+        settings.set_enable_write_console_messages_to_stdout(true);
+        eprintln!("Mezeporta WebKit startup diagnostics enabled");
+      }
+
       // Enable clipboard
       if attributes.clipboard {
         settings.set_javascript_can_access_clipboard(true);

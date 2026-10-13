@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
-# Diagnostic bridge for CLI-dev's MEZEPORTA_PROTON_CMD override.
+# Bridge launcher requests to Proton running on the SteamOS host.
 # stdin belongs to meze-deps: validate in memory and forward unchanged.
 set -euo pipefail
 umask 077
+
+# The portable launcher enters through Distrobox, while the AppImage already
+# runs on the SteamOS host and must keep host Python and library paths.
+direct_host="${MEZEPORTA_DIRECT_HOST:-0}"
+if [[ "$direct_host" == "1" ]]; then
+  unset PYTHONHOME
+  unset PYTHONPATH
+  unset LD_LIBRARY_PATH
+  host_exec=(env)
+else
+  command -v distrobox-host-exec >/dev/null
+  host_exec=(distrobox-host-exec env)
+fi
 
 log_dir="${MEZEPORTA_DEBUG_DIR:-${HOME}/.local/state/mezeporta}"
 mkdir -p "$log_dir"
@@ -12,8 +25,6 @@ printf '\n[%s] Proton host invocation\n' "$(date -Is)"
 : "${MEZEPORTA_HOST_PROTON:?Set the absolute host Proton script path}"
 : "${STEAM_COMPAT_DATA_PATH:?Missing compat-data directory}"
 : "${STEAM_COMPAT_CLIENT_INSTALL_PATH:?Missing Steam installation directory}"
-command -v distrobox-host-exec >/dev/null
-
 forward_env=(
   "STEAM_COMPAT_DATA_PATH=$STEAM_COMPAT_DATA_PATH"
   "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_COMPAT_CLIENT_INSTALL_PATH"
@@ -25,8 +36,8 @@ done
 # Python receives paths as arguments, not interpolated shell code. Its stdin
 # is forwarded unchanged. Proton owns WINEPREFIX and creates compat-data/pfx.
 status=0
-distrobox-host-exec env "${forward_env[@]}" python3 -c '
-import os, sys, base64, json, subprocess
+"${host_exec[@]}" "${forward_env[@]}" python3 -c '
+import os, sys, base64, json, subprocess, re
 cwd, proton = sys.argv[1:3]
 if not os.path.isfile(proton):
     sys.exit("Host Proton script does not exist: " + proton)
@@ -36,11 +47,48 @@ os.environ.pop("WINEPREFIX", None)
 print("Host cwd:", cwd, flush=True)
 print("Proton:", proton, flush=True)
 print("Compat data:", os.environ["STEAM_COMPAT_DATA_PATH"], flush=True)
+# Proton declares its required Steam runtime in toolmanifest.vdf.
+# Launch all setup and helper commands through that runtime, including i386.
+proton = os.path.realpath(proton)
+manifest_path = os.path.join(os.path.dirname(proton), "toolmanifest.vdf")
+try:
+    with open(manifest_path, encoding="utf-8") as manifest_file:
+        required = re.search(r"\"require_tool_appid\"\s+\"([0-9]+)\"", manifest_file.read())
+except OSError:
+    sys.exit("Cannot read Proton toolmanifest: " + manifest_path)
+if required is None:
+    sys.exit("Proton toolmanifest does not declare a required Steam runtime")
+runtime_id = required.group(1)
+runtime_name = {
+    "4183110": "SteamLinuxRuntime_4",
+    "1628350": "SteamLinuxRuntime_sniper",
+    "1391110": "SteamLinuxRuntime_soldier",
+}.get(runtime_id)
+if runtime_name is None:
+    sys.exit("Unsupported Steam runtime required by Proton: " + runtime_id)
+runtime_candidates = list(dict.fromkeys([
+    os.path.join(os.path.dirname(os.path.dirname(proton)), runtime_name, "_v2-entry-point"),
+    os.path.join(os.environ["STEAM_COMPAT_CLIENT_INSTALL_PATH"],
+                 "steamapps", "common", runtime_name, "_v2-entry-point"),
+]))
+runtime_entry = next(
+    (entry for entry in runtime_candidates if os.path.isfile(entry) and os.access(entry, os.X_OK)),
+    None,
+)
+if runtime_entry is None:
+    sys.exit("Required Steam runtime is not installed or executable: " + runtime_name +
+             ". Searched: " + ", ".join(runtime_candidates))
+print("Steam runtime:", runtime_entry, flush=True)
+print("Required runtime AppID:", runtime_id, flush=True)
+
+def proton_command(arguments):
+    return [runtime_entry, "--verb=run", "--", proton, *arguments]
+
 args = sys.argv[3:]
 print("Operation:", "helper stdin" if "--stdin-b64" in args else "runtime setup", flush=True)
-command = [sys.executable, proton, *args]
+command = proton_command(args)
 if "--stdin-b64" in args:
-    # Recupera il GameID del collegamento non Steam ricevuto da Distrobox.
+    # Read the non-Steam shortcut GameID from the Steam environment.
     steam_game_id = os.environ.get("SteamGameId", "")
     if not steam_game_id.isdecimal() or int(steam_game_id) == 0:
         steam_game_id = os.environ.get("SteamOverlayGameId", "")
@@ -79,7 +127,7 @@ if "--stdin-b64" in args:
             "--config-b64-file",
             windows_input,
         ]
-        command = [sys.executable, proton, *args]
+        command = proton_command(args)
 
         print("Transport: private config file to GUI helper", flush=True)
         with tempfile.TemporaryFile() as output_file:
@@ -184,7 +232,7 @@ if "--stdin-b64" in args:
             sys.stdout.buffer.flush()
 
     sys.exit(result.returncode if result.returncode >= 0 else 128 - result.returncode)
-os.execv(sys.executable, command)
+os.execv(command[0], command)
 ' "$PWD" "$MEZEPORTA_HOST_PROTON" "$@" || status=$?
 printf 'Proton host exit status: %s\n' "$status"
 exit "$status"

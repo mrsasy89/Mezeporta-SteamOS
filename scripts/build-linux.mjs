@@ -42,19 +42,18 @@ const projectRoot = resolve(scriptDir, "..");
 const packageVersion = JSON.parse(
   readFileSync(resolve(projectRoot, "package.json"), "utf8")
 ).version;
+const tauriTargetDir = env.CARGO_TARGET_DIR
+  ? resolve(projectRoot, env.CARGO_TARGET_DIR)
+  : resolve(projectRoot, "src-tauri", "target");
 const linuxBundleDir = resolve(
-  projectRoot,
-  "src-tauri",
-  "target",
+  tauriTargetDir,
   "x86_64-unknown-linux-gnu",
   "release",
   "bundle",
   "appimage"
 );
 const linuxReleaseDir = resolve(
-  projectRoot,
-  "src-tauri",
-  "target",
+  tauriTargetDir,
   "x86_64-unknown-linux-gnu",
   "release"
 );
@@ -62,9 +61,7 @@ const appDirPath = resolve(linuxBundleDir, "mezeporta.AppDir");
 const appImageFileName = `mezeporta_${packageVersion}_amd64.AppImage`;
 const extractedLinuxdeployDir = resolve(linuxBundleDir, ".linuxdeploy-tools");
 const portableBundleDir = resolve(
-  projectRoot,
-  "src-tauri",
-  "target",
+  tauriTargetDir,
   "x86_64-unknown-linux-gnu",
   "release",
   "bundle",
@@ -136,20 +133,85 @@ function resolveLinuxBinarySourcePath() {
   throw new Error(`Missing Linux release binary. Searched: ${searched}`);
 }
 
-function removeBundledGStreamer() {
+function removeBundledWayland() {
   if (!existsSync(appDirPath)) {
     throw new Error(`Missing AppDir for Linux bundle: ${appDirPath}`);
   }
 
+  // Mesa and EGL come from the SteamOS host. Use the matching host Wayland
+  // libraries as well instead of mixing them with the Ubuntu build copies.
   walkFiles(appDirPath, (fullPath, fileName) => {
-    if (
-      /^libgstreamer.*\.so(?:\..*)?$/i.test(fileName) ||
-      /^libgst.*\.so(?:\..*)?$/i.test(fileName) ||
-      fileName === "gst-plugin-scanner"
-    ) {
+    if (/^libwayland-.*\.so(?:\..*)?$/i.test(fileName)) {
       unlinkSync(fullPath);
     }
   });
+}
+
+function configureAppImageRuntime() {
+  if (!existsSync(appDirPath)) {
+    throw new Error(`Missing AppDir for Linux bundle: ${appDirPath}`);
+  }
+  if (!existsSync(protonHostBridgeSourcePath)) {
+    throw new Error(`Missing Proton host bridge: ${protonHostBridgeSourcePath}`);
+  }
+
+  const appRunPath = resolve(appDirPath, "AppRun");
+  const bridgeDir = resolve(appDirPath, "usr", "bin");
+  const bridgePath = resolve(bridgeDir, portableProtonHostBridgeFileName);
+
+  if (!existsSync(appRunPath)) {
+    throw new Error(`Missing AppImage AppRun script: ${appRunPath}`);
+  }
+
+  mkdirSync(bridgeDir, { recursive: true });
+  copyFileSync(protonHostBridgeSourcePath, bridgePath);
+  chmodSync(bridgePath, 0o755);
+
+  const appRunText = readFileSync(appRunPath, "utf8");
+  const execLine = 'exec "$this_dir"/AppRun.wrapped "$@"';
+  const occurrences = appRunText.split(execLine).length - 1;
+  if (occurrences !== 1) {
+    throw new Error(
+      `Expected one AppRun launch line, found ${occurrences}: ${appRunPath}`
+    );
+  }
+
+  const startMarker = "# BEGIN MEZEPORTA APPIMAGE RUNTIME";
+  const endMarker = "# END MEZEPORTA APPIMAGE RUNTIME";
+  const startOccurrences = appRunText.split(startMarker).length - 1;
+  const endOccurrences = appRunText.split(endMarker).length - 1;
+
+  if (startOccurrences !== endOccurrences || startOccurrences > 1) {
+    throw new Error(`Invalid Mezeporta runtime markers: ${appRunPath}`);
+  }
+  if (startOccurrences === 1) {
+    return;
+  }
+
+  const configuredLaunch = [
+    startMarker,
+    '# The game outlives the launcher, so keep the Proton bridge outside',
+    '# the temporary AppImage mount before starting any child process.',
+    'if [[ -z "${MEZEPORTA_PROTON_CMD:-}" ]]; then',
+    '  runtime_root="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"',
+    '  runtime_dir="$(mktemp -d "$runtime_root/mezeporta-$UID.XXXXXX")"',
+    '  runtime_bridge="$runtime_dir/mezeporta-proton-host.sh"',
+    '  cp "$this_dir/usr/bin/mezeporta-proton-host.sh" "$runtime_bridge"',
+    '  chmod 700 "$runtime_bridge"',
+    '  export MEZEPORTA_PROTON_CMD="$runtime_bridge"',
+    'fi',
+    'export MEZEPORTA_DIRECT_HOST="${MEZEPORTA_DIRECT_HOST:-1}"',
+    'export MEZEPORTA_HOST_PROTON="${MEZEPORTA_HOST_PROTON:-$HOME/.local/share/Steam/steamapps/common/Proton - Experimental/proton}"',
+    endMarker,
+    execLine,
+  ].join("\n");
+
+  writeFileSync(
+    appRunPath,
+    appRunText.replace(execLine, configuredLaunch),
+    { mode: 0o755 }
+  );
+  chmodSync(appRunPath, 0o755);
 }
 
 function resolveAppImageTool() {
@@ -463,7 +525,8 @@ async function main() {
     exit(result.status);
   }
 
-  removeBundledGStreamer();
+  removeBundledWayland();
+  configureAppImageRuntime();
   rebuildSanitizedAppImage();
   copyRuntimeSetupScripts();
   copyRawLinuxHelperLayout();
