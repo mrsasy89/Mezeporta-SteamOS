@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: windows-build-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   windows:
@@ -51,9 +51,14 @@ jobs:
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $release = 'src-tauri/target/i686-pc-windows-msvc/release'
           $portable = "artifacts/Mezeporta_${version}_windows_x86_portable"
-          if (!(Test-Path "$release/app.exe")) { throw 'Built launcher not found' }
+          $binary = @("$release/Mezeporta.exe", "$release/mezeporta.exe", "$release/app.exe") |
+            Where-Object { Test-Path $_ -PathType Leaf } | Select-Object -First 1
+          if (!$binary) {
+            Get-ChildItem $release -Filter '*.exe'
+            throw 'Built launcher not found'
+          }
           New-Item -ItemType Directory -Force $portable | Out-Null
-          Copy-Item "$release/app.exe" "$portable/Mezeporta.exe"
+          Copy-Item $binary "$portable/Mezeporta.exe"
           Copy-Item public/audio "$portable/audio" -Recurse
           Copy-Item LICENSE $portable
           @"

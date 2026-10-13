@@ -45,9 +45,10 @@ npm ci
 npm run tauri:build -- --ci --target i686-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 ```
 
-The raw executable is `src-tauri/target/i686-pc-windows-msvc/release/app.exe`;
-the installer is under that release directory's `bundle/nsis/`. The workflow
-packages the executable as `Mezeporta.exe` and creates checksums.
+Outputs are under `src-tauri/target/i686-pc-windows-msvc/release/`; the installer
+is in `bundle/nsis/`. The workflow accepts the product or Cargo executable name,
+packages it as `Mezeporta.exe` and creates checksums. A new push cancels an
+outdated build of the same branch so artifacts correspond to the latest source.
 
 `src-tauri/tauri.windows.conf.json` supplements the common configuration. The
 existing `beforeBuildCommand` builds the frontend; `npm ci` preserves its
