@@ -26,6 +26,7 @@ Active SteamOS development is maintained on the `steamos-dev` branch.
 | Native KDE folder picker on SteamOS | Verified |
 | Hidden helper transport without a console window | Verified |
 | Standalone AppImage without an external Proton proxy | Verified |
+| Linux UI sound effects in the AppImage using host GStreamer | Verified on the maintainer's Steam Machine |
 | Gaming Mode / Gamescope at native 1920×1080 | Verified |
 | Land entry, mouse, keyboard and controller | Verified |
 | Launcher shutdown while the game remains running | Verified |
@@ -33,8 +34,8 @@ Active SteamOS development is maintained on the `steamos-dev` branch.
 | Current rebuilt portable package | Generated; needs its own runtime retest |
 | Native Windows x86 build, installer and portable ZIP | Verified in GitHub Actions; game runtime test pending |
 
-See [Docs/SteamOS.md](Docs/SteamOS.md) for the implementation notes and
-requirements, implementation notes, troubleshooting and validation evidence.
+See [Docs/SteamOS.md](Docs/SteamOS.md) for implementation details, requirements,
+troubleshooting and validation evidence.
 
 ## SteamOS AppImage: recommended installation
 
@@ -54,6 +55,13 @@ The AppImage includes its host bridge and stages it outside the temporary mount
 so the game can outlive the launcher. No external test proxy or Distrobox is
 needed to run this package. Game files and configuration remain in the selected
 game directory; the AppImage does not contain the game client.
+
+On Linux, launcher sound effects use a native GStreamer subprocess instead of
+WebKit's HTML audio path. The AppImage deliberately runs the host's
+`gst-inspect-1.0` and `gst-launch-1.0`, with AppImage library and plugin path
+overrides removed for those child processes. The host needs GStreamer decoding,
+conversion, resampling, volume and an available PulseAudio or PipeWire sink.
+Playback failures are written to the application log.
 
 See [Docs/Windows.md](Docs/Windows.md) to build native Windows packages from
 SteamOS through GitHub Actions.

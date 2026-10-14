@@ -1942,20 +1942,50 @@ fn find_missing_wine_tools(runtime: &ResolvedWineRuntime) -> Vec<String> {
 }
 
 #[cfg(not(windows))]
+fn host_gstreamer_command(program: &str) -> Option<Command> {
+    let executable = ["/usr/bin", "/usr/local/bin", "/bin"]
+        .into_iter()
+        .map(|directory| Path::new(directory).join(program))
+        .find(|path| path.is_file())?;
+
+    let mut command = Command::new(executable);
+    // AppImage prepends its bundled libraries and GStreamer plugins. Native
+    // audio must use the host binaries and their matching host libraries.
+    command.env_remove("LD_LIBRARY_PATH");
+    command.env_remove("LD_PRELOAD");
+    for variable in [
+        "GST_PLUGIN_PATH",
+        "GST_PLUGIN_PATH_1_0",
+        "GST_PLUGIN_SYSTEM_PATH",
+        "GST_PLUGIN_SYSTEM_PATH_1_0",
+        "GST_PLUGIN_SCANNER",
+        "GST_PLUGIN_SCANNER_1_0",
+        "GST_REGISTRY",
+        "GST_REGISTRY_1_0",
+    ] {
+        command.env_remove(variable);
+    }
+    Some(command)
+}
+
+#[cfg(not(windows))]
 fn gstreamer_component_available(component: &str) -> bool {
-    command_exists(Path::new("gst-inspect-1.0"))
-        && Command::new("gst-inspect-1.0")
-            .arg(component)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|status| status.success())
-            .unwrap_or(false)
+    host_gstreamer_command("gst-inspect-1.0")
+        .map(|mut command| {
+            command
+                .arg(component)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
 }
 
 #[cfg(not(windows))]
 fn find_missing_linux_audio_runtime() -> Vec<String> {
-    if !command_exists(Path::new("gst-inspect-1.0")) {
+    if host_gstreamer_command("gst-inspect-1.0").is_none() {
         return vec!["gst-inspect-1.0".to_string()];
     }
 
@@ -2271,7 +2301,8 @@ fn create_linux_ui_sfx_command(audio_path: &Path, volume: f32) -> Result<Command
     let uri = Url::from_file_path(audio_path)
         .map_err(|_| format!("failed to build file URI for {}", audio_path.display()))?
         .to_string();
-    let mut command = Command::new("gst-launch-1.0");
+    let mut command = host_gstreamer_command("gst-launch-1.0")
+        .ok_or_else(|| "host gst-launch-1.0 was not found".to_string())?;
     command
         .arg("-q")
         .arg("uridecodebin")
@@ -3566,10 +3597,20 @@ async fn play_linux_ui_sfx(
             ));
         }
 
-        command.stderr(Stdio::null());
-        command
+        let child = command
             .spawn()
             .map_err(|err| format!("failed to start Linux ui sfx '{}': {}", name, err))?;
+        let name_for_log = name.clone();
+        std::thread::spawn(move || match child.wait_with_output() {
+            Ok(output) if !output.status.success() => error!(
+                "Linux UI SFX '{}' exited with status {}: {}",
+                name_for_log,
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+            Err(err) => error!("failed waiting for Linux UI SFX '{}': {}", name_for_log, err),
+            _ => {}
+        });
         return Ok(());
     }
 

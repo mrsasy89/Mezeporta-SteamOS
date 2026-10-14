@@ -1,6 +1,6 @@
 # SteamOS: installation, build and verified runtime
 
-## Verified status — 13 October 2026
+## Verified status — 14 October 2026
 
 The maintainer tested the standalone AppImage in Desktop Mode and Gaming Mode
 at native 1920×1080. Login, character selection, land entry, mouse, keyboard,
@@ -10,6 +10,11 @@ external Proton proxy. The game remained running when the launcher closed.
 Test environment: SteamOS 3.8.28, build 20260922.1, AMD graphics, kernel
 6.18.50-valve2-1, Proton Experimental `experimental-11.0-20261001-x86_64` and
 Steam Linux Runtime 4. The build used the `mhfz-appimage` Distrobox.
+
+The AppImage UI sound effects were also verified on the maintainer's Steam
+Machine: effects played and the launcher remained responsive. The host audio
+path was independently checked with a GStreamer tone sent to `pulsesink`.
+This audio result is separate from the Gaming Mode game-entry validation.
 
 These are results on the maintainer's machine, not a guarantee for every driver,
 server or game version. Higher resolutions, external televisions and the current
@@ -93,6 +98,30 @@ Bundled Wayland libraries are excluded because SteamOS supplies Mesa/EGL and
 the matching Wayland libraries. Removing the build-container copies fixed the
 original gray launcher with `EGL_BAD_PARAMETER`. GStreamer remains bundled.
 This fix does not disable WebGL or force software rendering globally.
+
+## AppImage UI sound effects
+
+Linux UI effects are dispatched from the frontend to the native Tauri command
+`play_linux_ui_sfx`. This avoids WebKit's HTML audio/GStreamer playback path,
+which had frozen the launcher on a Steam Deck. The Linux frontend uses the
+native route directly; Windows continues to use HTML audio.
+
+An AppImage starts with its own library and GStreamer plugin paths. Reusing
+those paths for a host audio process can mix AppImage libraries/plugins with
+the SteamOS audio stack. The native command therefore resolves
+`gst-inspect-1.0` and `gst-launch-1.0` from standard host executable directories
+and removes `LD_LIBRARY_PATH`, `LD_PRELOAD` and inherited `GST_*` overrides for
+those subprocesses. It checks for `uridecodebin`, `audioconvert`,
+`audioresample`, `volume`, and an available `pulsesink` or `pipewiresink` before
+enabling UI playback. Runtime playback errors are logged instead of silently
+discarded.
+
+On the tested SteamOS host, `gst-inspect-1.0 autoaudiosink` found the host plugin
+and a GStreamer tone through `pulsesink` was audible. The rebuilt AppImage then
+played launcher effects without freezing. An earlier journal contained a
+GStreamer `autoaudiosink` warning alongside a WebKit process abort; that log
+alone did not establish the abort's cause. The tested fix routes Linux effects
+through the host GStreamer installation and exposes playback failures.
 
 `scripts/build-linux.mjs` stages the bridge, injects an idempotent marked
 AppRun block, repackages the sanitized AppImage and creates the portable tarball.

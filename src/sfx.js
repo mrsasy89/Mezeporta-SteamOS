@@ -114,7 +114,7 @@ async function playLinuxUiSfx(name, { waitForEnd = false } = {}) {
     });
     return true;
   } catch (error) {
-    if (import.meta.env?.DEV && !LINUX_SFX_WARNED.has(name)) {
+    if (!LINUX_SFX_WARNED.has(name)) {
       LINUX_SFX_WARNED.add(name);
       console.warn(`Linux UI SFX "${name}" failed:`, error);
     }
@@ -281,14 +281,9 @@ async function playHtmlAudioName(name, { requiresUnlock = false, waitForEnd = fa
 async function playName(name, { requiresUnlock = false, waitForEnd = false } = {}) {
   if (!store.settings?.sfxEnabled) return false;
   if (runtimePlatform === "linux") {
-    if (await playHtmlAudioName(name, { requiresUnlock, waitForEnd })) {
-      return true;
-    }
-    const played = await playLinuxUiSfx(name, { waitForEnd });
-    if (played) {
-      return true;
-    }
-    return false;
+    // Keep Linux UI audio out of WebKit's HTMLAudio/GStreamer path. The native
+    // command selects an explicit host sink (PulseAudio or PipeWire).
+    return playLinuxUiSfx(name, { waitForEnd });
   }
   return playHtmlAudioName(name, { requiresUnlock, waitForEnd });
 }
