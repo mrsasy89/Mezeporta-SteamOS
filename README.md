@@ -1,10 +1,10 @@
-# Mezeporta for SteamOS and Linux
+# Mezeporta SteamOS
 
 Mezeporta is a Monster Hunter Frontier launcher for Erupe community servers,
-supporting 19 versions across all game branches. This fork provides an x86_64
-Linux AppImage and focuses on running the Windows game through Proton. SteamOS
-is the currently verified distribution. Broader compatibility with other Linux
-distributions is a project target, not yet a verified support claim.
+supporting 19 versions across all game branches. This fork focuses on running
+the launcher and Windows game client on SteamOS through Proton's required
+Steam Linux Runtime. The standalone AppImage runs directly on SteamOS;
+Distrobox is used for building it and for the alternative portable package.
 
 It is based on [LilButter/Mezeporta](https://github.com/LilButter/Mezeporta).
 Active SteamOS development is maintained on the `steamos-dev` branch.
@@ -35,15 +35,21 @@ Active SteamOS development is maintained on the `steamos-dev` branch.
 | Native Windows x86 build, installer and portable ZIP | Verified in GitHub Actions; game runtime test pending |
 
 See [Docs/SteamOS.md](Docs/SteamOS.md) for implementation details, requirements,
-troubleshooting and SteamOS validation. See [Docs/Linux.md](Docs/Linux.md) for
-the cross-distribution target, host requirements and compatibility status.
+troubleshooting and validation evidence.
 
-## Linux AppImage (x86_64)
+## SteamOS AppImage: recommended installation
 
-The AppImage is built for x86_64 Linux. So far, full launcher and game testing
-has been completed only on SteamOS; Ubuntu, Debian, Fedora and other
-distributions remain unverified. Before testing, check the host requirements in
-[Docs/Linux.md](Docs/Linux.md).
+1. Keep the AppImage in a permanent directory and make it executable:
+   `chmod +x Mezeporta-SteamOS.AppImage`.
+2. Open it in Desktop Mode, select the MHFZ game directory and set
+   **Wine Prefix: Proton** in launcher settings.
+3. Install Proton Experimental and its required Steam Linux Runtime through
+   Steam. The tested Experimental version requires **Steam Linux Runtime 4.0**.
+4. Add the AppImage as a non-Steam shortcut. Point directly to the AppImage,
+   leave **Launch Options empty**, and leave **Force the use of a specific
+   Steam Play compatibility tool disabled**. The native Linux launcher selects
+   Proton for the Windows game itself.
+5. Launch that shortcut in Gaming Mode. Native 1920×1080 has been verified.
 
 The AppImage includes its host bridge and stages it outside the temporary mount
 so the game can outlive the launcher. No external test proxy or Distrobox is
@@ -56,16 +62,6 @@ WebKit's HTML audio path. The AppImage deliberately runs the host's
 overrides removed for those child processes. The host needs GStreamer decoding,
 conversion, resampling, volume and an available PulseAudio or PipeWire sink.
 Playback failures are written to the application log.
-
-### SteamOS Gaming Mode
-
-Keep the AppImage in a permanent directory and make it executable with
-`chmod +x Mezeporta-SteamOS.AppImage`. In launcher settings, select the game
-directory and **Wine Prefix: Proton**. Install Proton Experimental and its
-required Steam Linux Runtime through Steam. Add the AppImage itself as a
-non-Steam shortcut, leave launch options empty, and do not force a Steam Play
-compatibility tool on the Linux launcher. Native 1920×1080 Gaming Mode has been
-verified on the maintainer's SteamOS machine.
 
 See [Docs/Windows.md](Docs/Windows.md) to build native Windows packages from
 SteamOS through GitHub Actions.

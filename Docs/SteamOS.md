@@ -1,9 +1,5 @@
 # SteamOS: installation, build and verified runtime
 
-This document records the SteamOS-specific test results. The broader Linux
-compatibility goal, host requirements and untested distribution matrix are in
-[Linux compatibility](Linux.md).
-
 ## Verified status — 14 October 2026
 
 The maintainer tested the standalone AppImage in Desktop Mode and Gaming Mode
