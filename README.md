@@ -6,16 +6,45 @@ the launcher and Windows game client on SteamOS through Proton's required
 Steam Linux Runtime. The standalone AppImage runs directly on SteamOS;
 Distrobox is used for building it and for the alternative portable package.
 
-It is based on [LilButter/Mezeporta](https://github.com/LilButter/Mezeporta).
-Active SteamOS development is maintained on the `steamos-dev` branch.
+[LilButter/Mezeporta](https://github.com/LilButter/Mezeporta) is the original,
+main upstream project. Mezeporta SteamOS is an independently maintained fork
+focused on SteamOS; its changes and packages are maintained separately from
+LilButter's main version. Active SteamOS development is maintained on the
+`steamos-dev` branch.
+
+## Tested platforms and hardware
+
+Runtime testing of this fork has been performed **only on SteamOS, on Valve
+hardware**:
+
+- **Steam Machine**: primary development and test machine.
+- **Steam Deck**: secondary test machine.
+
+**Other Linux distributions and other Linux versions have not been tested.**
+The results documented below apply to the tested SteamOS environment and do
+not establish compatibility with other distributions, Linux versions or
+hardware. The status table does not imply that every check was repeated on
+both devices.
+
+The Arch Distrobox mentioned below is a build/development container running
+on the SteamOS host, not a separately tested host distribution. Instructions
+for WSL, Ubuntu and other Linux environments are provided as build guidance;
+they do not represent validated runtime configurations. Windows CI build
+checks are also separate from game runtime testing.
+
+For issues specific to this fork, use this repository's
+[Issues section](https://github.com/mrsasy89/Mezeporta-SteamOS/issues).
+For the main project, refer to [LilButter/Mezeporta](https://github.com/LilButter/Mezeporta).
 
 > [!IMPORTANT]
-> The AppImage has been tested in Desktop Mode and Gaming Mode at native
+> On the SteamOS / Valve hardware described above, the AppImage has been tested in Desktop Mode and Gaming Mode at native
 > **1920×1080**, including land entry, mouse, keyboard, controller and normal
 > shutdown. Proton Experimental runs through its declared Steam Linux Runtime.
 > Resolutions above 1080p have not yet been tested.
 
 ## SteamOS status
+
+The following runtime results are limited to the SteamOS test environment above.
 
 | Area | Status |
 | --- | --- |
