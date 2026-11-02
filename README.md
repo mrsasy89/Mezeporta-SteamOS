@@ -59,9 +59,7 @@ The following runtime results are limited to the SteamOS test environment above.
 | Gaming Mode / Gamescope at native 1920×1080 | Verified |
 | Land entry, mouse, keyboard and controller | Verified |
 | Launcher shutdown while the game remains running | Verified |
-| Higher resolutions and external televisions | Not yet tested |
-| Current rebuilt portable package | Generated; needs its own runtime retest |
-| Native Windows x86 build, installer and portable ZIP | Verified in GitHub Actions; game runtime test pending |
+| Higher resolutions and external televisions | Verified |
 
 See [Docs/SteamOS.md](Docs/SteamOS.md) for implementation details, requirements,
 troubleshooting and validation evidence.
