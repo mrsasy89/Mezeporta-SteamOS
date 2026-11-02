@@ -1,16 +1,32 @@
 # Mezeporta SteamOS
 
-Mezeporta is a Monster Hunter Frontier launcher for Erupe community servers,
-supporting 19 versions across all game branches. This fork focuses on running
-the launcher and Windows game client on SteamOS through Proton's required
-Steam Linux Runtime. The standalone AppImage runs directly on SteamOS;
-Distrobox is used for building it and for the alternative portable package.
+[Mezeporta](https://github.com/LilButter/Mezeporta), created and maintained by
+**LilButter**, is the original and main project: a Monster Hunter Frontier
+launcher for Erupe community servers, supporting 19 versions across all game
+branches. This fork builds on LilButter's work, with gratitude for the launcher
+and the continued development that make this adaptation possible.
 
-[LilButter/Mezeporta](https://github.com/LilButter/Mezeporta) is the original,
-main upstream project. Mezeporta SteamOS is an independently maintained fork
-focused on SteamOS; its changes and packages are maintained separately from
-LilButter's main version. Active SteamOS development is maintained on the
-`steamos-dev` branch.
+**Mezeporta SteamOS was created solely to make the launcher and Windows game
+client work on SteamOS running on Valve hardware (Steam Machine and Steam
+Deck).** That is the scope of this fork's development and runtime testing.
+Other Linux distributions, other Linux versions and non-Valve hardware are
+outside that scope and have not been tested by the fork maintainer.
+
+I maintain the SteamOS-specific changes, integration and packages in this
+repository and take responsibility for investigating reports concerning this
+fork here. Please report problems with this fork in
+[our Issues section](https://github.com/mrsasy89/Mezeporta-SteamOS/issues),
+including reports from untested environments; those reports are welcome, but
+compatibility outside the stated scope has not been validated. There is no
+expectation that LilButter will investigate or support this fork's changes.
+
+LilButter's repository remains the main reference for Mezeporta. This fork is
+an independently maintained adaptation for the specific environment above,
+with full credit to the original project.
+
+Active development is on the `steamos-dev` branch. The launcher uses Proton's
+required Steam Linux Runtime. The standalone AppImage runs directly on
+SteamOS; Distrobox is used to build it and for the alternative portable package.
 
 ## Tested platforms and hardware
 
@@ -31,10 +47,6 @@ on the SteamOS host, not a separately tested host distribution. Instructions
 for WSL, Ubuntu and other Linux environments are provided as build guidance;
 they do not represent validated runtime configurations. Windows CI build
 checks are also separate from game runtime testing.
-
-For issues specific to this fork, use this repository's
-[Issues section](https://github.com/mrsasy89/Mezeporta-SteamOS/issues).
-For the main project, refer to [LilButter/Mezeporta](https://github.com/LilButter/Mezeporta).
 
 > [!IMPORTANT]
 > On the SteamOS / Valve hardware described above, the AppImage has been tested in Desktop Mode and Gaming Mode at native
